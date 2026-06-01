@@ -1,26 +1,27 @@
-# TimeTrack Desktop Agent (Windows)
+# TimeTrack Desktop Agents (Windows)
 
-A transparent, employer-deployed time tracker. While running, it detects active
-vs idle time and the title of the focused window, and reports active minutes to
-your TimeTrack server for the project the employee selects.
+Two ways for employees to track time without the browser:
 
-**It does NOT record keystrokes, passwords, or screenshots.** It prints what it
-is doing and is not hidden. Employees must be informed it is running, and you are
-responsible for following local consent/monitoring laws.
+## KlickTime (recommended) — system-tray app with hotkeys
+`klicktime.py` → builds into **KlickTime.exe**. Lives in the system tray, shows
+the employee's assigned projects with hotkeys (Ctrl+Alt+1..9). Click or press a
+project to start; switch projects in one tap; auto-pauses after the firm's idle
+timeout (set by the admin). Sends active minutes to the server, which adds them
+to that day's hours — same data as the web app.
 
-## Run (on the employee's PC)
-1. Install Python 3 and the requests library: `pip install requests`
-2. Copy `config.example.json` to `config.json` and set `server_url` to your
-   TimeTrack backend (e.g. your VPS address).
-3. Run: `python timetrack_agent.py`
-4. Sign in once (only a refresh token is stored afterwards — not the password),
-   pick the current project, and leave it running. Type a number to switch
-   projects, or `q` to quit.
+**Build KlickTime.exe (on a Windows PC with Python installed):**
+1. Open a terminal in this `agent` folder.
+2. Double-click `build_KlickTime.bat` (or run it).
+3. The result is `dist\KlickTime.exe`.
+4. Put `KlickTime.exe` and a `config.json` (copy `config.example.json`, set your
+   server URL) together on each employee PC. Double-click to run.
 
-## What gets sent each interval
-`project, minutes, active (true/false), app (exe name), window_title`
+First run asks for the employee's login once (stores only a token after).
 
-## Notes & limits (first version)
-- Windows only for activity detection (it will run elsewhere but report active).
-- Console app for now; packaging as a tray app / auto-start service is a next step.
-- Idle threshold and interval are set in config.json.
+## timetrack_agent.py — simple console version
+A no-frills console tracker (same server, no tray/hotkeys). Useful for testing.
+
+## Privacy
+Both send app/window titles + active minutes only — no keystrokes, screenshots,
+or passwords. They announce themselves and are not hidden. Inform employees and
+follow local consent rules. Idle timeout is configured by the admin per firm.

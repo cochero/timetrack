@@ -34,7 +34,13 @@ export default function Layout({ children }) {
           <button className="logout" onClick={logout}>Sign out</button>
         </div>
       </aside>
-      <main className="content"><TimerBar />{children}</main>
+      <main className="content">
+        <TimerBar />
+        {children}
+        <footer className="app-footer">
+          Developed by <a href="https://klickevents.in" target="_blank" rel="noreferrer">Klickevents Infosolutions Pvt Ltd</a>
+        </footer>
+      </main>
     </div>
   );
 }

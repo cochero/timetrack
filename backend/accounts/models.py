@@ -17,6 +17,8 @@ class Organization(TimeStampedModel):
     timezone = models.CharField(max_length=64, default="Asia/Kolkata")
     plan = models.CharField(max_length=20, choices=PLAN_CHOICES, default="FREE")
     is_active = models.BooleanField(default=True)
+    # Org-wide: minutes of inactivity before KlickTime pauses logging.
+    idle_timeout_minutes = models.PositiveIntegerField(default=5)
 
     def __str__(self):
         return self.name

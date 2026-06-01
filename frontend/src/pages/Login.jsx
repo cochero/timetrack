@@ -32,7 +32,10 @@ export default function Login() {
           <p>Track dedicated and shared resources across all your clients —
              and see exactly where the billable hours go.</p>
         </div>
-        <div className="login-foot">Operations Console · v0.1</div>
+        <div className="login-foot">
+          Operations Console · v0.1<br />
+          Developed by <a href="https://klickevents.in" target="_blank" rel="noreferrer">Klickevents Infosolutions Pvt Ltd</a>
+        </div>
       </div>
       <div className="login-form-side">
         <form className="login-card" onSubmit={submit}>

@@ -45,3 +45,23 @@ class UserViewSet(OrgScopedModelViewSet):
             raise ValidationError("You can't deactivate your own account.")
         instance.is_active = False
         instance.save(update_fields=["is_active"])
+
+
+class OrgView(generics.RetrieveUpdateAPIView):
+    """Read the firm's settings; managers can update (e.g. idle timeout)."""
+    serializer_class = ManageUserSerializer  # placeholder, replaced below
+    permission_classes = [IsAuthenticatedInOrg]
+
+    def get_object(self):
+        return self.request.user.organization
+
+    def get_serializer_class(self):
+        from .serializers import OrganizationSerializer
+        return OrganizationSerializer
+
+    def update(self, request, *args, **kwargs):
+        from common.permissions import MANAGER_ROLES
+        from rest_framework.exceptions import PermissionDenied
+        if request.user.role not in MANAGER_ROLES:
+            raise PermissionDenied("Only managers can change firm settings.")
+        return super().update(request, *args, **kwargs)

@@ -75,3 +75,10 @@ class ManageUserSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         validated_data.pop("password", None)  # password changes happen via a separate flow
         return super().update(instance, validated_data)
+
+
+class OrganizationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Organization
+        fields = ["id", "name", "slug", "timezone", "plan", "idle_timeout_minutes"]
+        read_only_fields = ["id", "slug", "plan"]
