@@ -1,0 +1,27 @@
+# --- Python / Django ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+db.sqlite3
+*.sqlite3
+staticfiles/
+
+# --- Secrets & local env (examples ARE committed) ---
+.env
+**/.env
+
+# --- Node / frontend ---
+node_modules/
+dist/
+
+# --- Desktop agent local files ---
+agent/config.json
+agent/token.json
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

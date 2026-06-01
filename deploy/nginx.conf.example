@@ -1,0 +1,26 @@
+# Nginx site for TimeTrack. Copy to /etc/nginx/sites-available/timetrack,
+# replace timetrack.example.com with your domain, then:
+#   sudo ln -s /etc/nginx/sites-available/timetrack /etc/nginx/sites-enabled/
+#   sudo nginx -t && sudo systemctl reload nginx
+# Then run: sudo certbot --nginx -d timetrack.example.com   (adds HTTPS)
+
+server {
+    listen 80;
+    server_name timetrack.example.com;
+
+    # Built React frontend (the screens)
+    root /srv/timetrack/frontend/dist;
+    index index.html;
+
+    client_max_body_size 10M;
+
+    # API and admin -> Gunicorn (the engine)
+    location /api/   { proxy_pass http://127.0.0.1:8001; include /etc/nginx/proxy_params; }
+    location /admin/ { proxy_pass http://127.0.0.1:8001; include /etc/nginx/proxy_params; }
+    location /static/ { proxy_pass http://127.0.0.1:8001; include /etc/nginx/proxy_params; }
+
+    # Everything else -> the SPA (so React Router paths work on refresh)
+    location / {
+        try_files $uri /index.html;
+    }
+}
