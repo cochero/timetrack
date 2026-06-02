@@ -68,32 +68,32 @@ export default function Projects() {
         )}
       </div>
 
-      <div className="table-card">
-        <table className="data">
-          <thead>
-            <tr><th>Project</th><th>Client</th><th>Status</th><th>Billable</th>{manager && <th></th>}</tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td className="empty-row" colSpan={5}>Loading…</td></tr>
-            ) : filtered.length === 0 ? (
-              <tr><td className="empty-row" colSpan={5}>No projects yet.</td></tr>
-            ) : filtered.map((p) => (
-              <tr key={p.id}>
-                <td>{p.name}{p.code ? <span className="num" style={{ color: "var(--muted)" }}> · {p.code}</span> : null}</td>
-                <td>{p.client_name}</td>
-                <td><span className={"badge " + p.status.toLowerCase()}>{STATUS_LABEL[p.status]}</span></td>
-                <td><span className={"badge " + (p.is_billable ? "yes" : "no")}>{p.is_billable ? "Billable" : "Internal"}</span></td>
-                {manager && (
-                  <td><div className="row-actions">
-                    <button className="link-btn" onClick={() => openEdit(p)}>Edit</button>
-                    <button className="link-btn danger" onClick={() => remove(p)}>Delete</button>
-                  </div></td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="project-list">
+        {loading ? (
+          <div className="empty-row">Loading…</div>
+        ) : filtered.length === 0 ? (
+          <div className="empty-row">No projects yet.</div>
+        ) : filtered.map((p) => (
+          <div key={p.id} className={"project-row" + (p.status === "ACTIVE" ? " is-active" : "")}>
+            <div className="project-main">
+              <div className="project-name">
+                {p.name}
+                {p.code ? <span className="project-code"> · {p.code}</span> : null}
+              </div>
+              <div className="project-sub">{p.client_name}</div>
+            </div>
+            <div className="project-tags">
+              <span className={"badge " + p.status.toLowerCase()}>{STATUS_LABEL[p.status]}</span>
+              <span className={"badge " + (p.is_billable ? "yes" : "no")}>{p.is_billable ? "Billable" : "Internal"}</span>
+            </div>
+            {manager && (
+              <div className="row-actions">
+                <button className="link-btn" onClick={() => openEdit(p)}>Edit</button>
+                <button className="link-btn danger" onClick={() => remove(p)}>Delete</button>
+              </div>
+            )}
+          </div>
+        ))}
       </div>
 
       {modal && (

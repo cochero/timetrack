@@ -233,12 +233,63 @@ def fmt(sec):
     return f"{h}:{m:02d}:{s:02d}"
 
 
+def ask_client_meeting(clients):
+    """Popup to pick a client and enter a topic. Returns (client_dict, topic) or (None, '')."""
+    try:
+        import tkinter as tk
+        result = {"client": None, "topic": ""}
+        win = tk.Tk()
+        win.title("Client meeting")
+        win.configure(bg="#ffffff")
+        win.resizable(False, False)
+        W, H = 360, 230
+        sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
+        win.geometry(f"{W}x{H}+{(sw - W)//2}+{max(0,(sh - H)//3)}")
+
+        tk.Label(win, text="Client", bg="#ffffff", fg="#5c6b73", font=("Segoe UI", 9)).pack(anchor="w", padx=24, pady=(20, 4))
+        names = [c["name"] for c in clients]
+        var = tk.StringVar(value=names[0] if names else "")
+        tk.OptionMenu(win, var, *(names or [""])).pack(fill="x", padx=24)
+
+        tk.Label(win, text="Meeting topic", bg="#ffffff", fg="#5c6b73", font=("Segoe UI", 9)).pack(anchor="w", padx=24, pady=(14, 4))
+        topic = tk.Entry(win, font=("Segoe UI", 11), relief="solid", bd=1)
+        topic.pack(fill="x", padx=24, ipady=5)
+
+        def ok():
+            sel = var.get()
+            result["client"] = next((c for c in clients if c["name"] == sel), None)
+            result["topic"] = topic.get().strip()
+            win.destroy()
+
+        tk.Button(win, text="Start meeting", command=ok, bg="#0e7c66", fg="#ffffff",
+                  relief="flat", font=("Segoe UI Semibold", 10), cursor="hand2").pack(fill="x", padx=24, pady=18, ipady=6)
+        topic.focus_set()
+        win.mainloop()
+        return result["client"], result["topic"]
+    except Exception:
+        return None, ""
+
+
+def ask_text(title, prompt):
+    """Small popup to capture a meeting description. Returns trimmed text or ''."""
+    try:
+        import tkinter as tk
+        from tkinter import simpledialog
+        root = tk.Tk(); root.withdraw()
+        val = simpledialog.askstring(title, prompt)
+        root.destroy()
+        return (val or "").strip()
+    except Exception:
+        return ""
+
+
 # ---------------- The app ----------------
 class KlickTime:
     def __init__(self, cfg):
         self.s = Session(cfg["server_url"])
         self.mode = str(cfg.get("mode", "dedicated")).lower()   # "dedicated" or "shared"
         self.projects = []
+        self.clients = []
         self.idle_limit = 5 * 60          # seconds; refreshed from server
         self.current = None               # index into self.projects, or None
         self.session_seconds = 0          # active seconds on current project (display)
@@ -248,6 +299,10 @@ class KlickTime:
         self.img_color = None
         self.img_gray = None
         self._icon_is_color = None
+        self.on_break = False
+        self.break_resume_idx = None
+        self.break_started_at = 0.0
+        self.meeting = None      # None, or {"type","description","client_id","client_name","entry_id"}
 
     # --- setup ---
     def authenticate(self):
@@ -267,18 +322,45 @@ class KlickTime:
             if p and p.get("status") == "ACTIVE" and p["id"] not in seen:
                 seen.add(p["id"]); mine.append(p)
         self.projects = (mine or [p for p in all_projects if p.get("status") == "ACTIVE"])[:9]
+        try:
+            self.clients = self.s.get("/api/clients/").get("results", [])
+        except Exception:
+            self.clients = []
 
     # --- timing ---
+    def _tracking(self):
+        return self.current is not None or self.meeting is not None
+
+    def _current_label(self):
+        if self.meeting:
+            if self.meeting["type"] == "INTERNAL_MEETING":
+                return "Internal meeting"
+            return f"Client meeting · {self.meeting.get('client_name','')}"
+        if self.current is not None:
+            return self.projects[self.current]["name"]
+        return ""
+
     def send(self, minutes, active):
         if minutes <= 0 and active:
             return
-        proj = self.projects[self.current] if self.current is not None else None
         exe, title = active_window()
+        body = {"minutes": minutes, "active": active, "app": exe, "window_title": title}
+        if self.meeting:
+            body["activity_type"] = self.meeting["type"]
+            body["description"] = self.meeting.get("description", "")
+            if self.meeting.get("client_id"):
+                body["client"] = self.meeting["client_id"]
+            if self.meeting.get("entry_id"):
+                body["entry_id"] = self.meeting["entry_id"]
+        elif self.current is not None:
+            body["activity_type"] = "WORK"
+            body["project"] = self.projects[self.current]["id"]
+        else:
+            return
         try:
-            self.s.post(HEARTBEAT_PATH, {
-                "project": proj["id"] if proj else None,
-                "minutes": minutes, "active": active, "app": exe, "window_title": title,
-            })
+            resp = self.s.post(HEARTBEAT_PATH, body)
+            if self.meeting and isinstance(resp, dict) and resp.get("entry_id"):
+                self.meeting["entry_id"] = resp["entry_id"]   # keep adding to the same meeting
         except Exception:
             pass  # offline tick; try again next minute
 
@@ -292,6 +374,9 @@ class KlickTime:
     def select(self, idx):
         if idx >= len(self.projects):
             return
+        self.on_break = False              # picking a project ends any break
+        self.break_resume_idx = None
+        self.meeting = None                # and ends any meeting
         if self.current == idx:
             return
         self.flush()                       # append previous project's pending time
@@ -301,7 +386,61 @@ class KlickTime:
         self._apply_icon(True)
         self._refresh_tray()
 
+    def start_internal_meeting(self, description):
+        self.on_break = False
+        self.break_resume_idx = None
+        self.flush()                       # bank whatever was running
+        self.current = None
+        self.meeting = {"type": "INTERNAL_MEETING", "description": description, "entry_id": None}
+        self.session_seconds = 0
+        self.unsent_seconds = 0
+        self._apply_icon(True)
+        self._refresh_tray()
+
+    def _prompt_internal_meeting(self, *_):
+        desc = ask_text("Internal meeting", "What is the meeting about?")
+        if desc:
+            self.start_internal_meeting(desc)
+
+    def start_client_meeting(self, client, topic):
+        self.on_break = False
+        self.break_resume_idx = None
+        self.flush()
+        self.current = None
+        self.meeting = {
+            "type": "CLIENT_MEETING", "description": topic,
+            "client_id": client["id"], "client_name": client.get("name", ""), "entry_id": None,
+        }
+        self.session_seconds = 0
+        self.unsent_seconds = 0
+        self._apply_icon(True)
+        self._refresh_tray()
+
+    def _prompt_client_meeting(self, *_):
+        if not self.clients:
+            return
+        client, topic = ask_client_meeting(self.clients)
+        if client and topic:
+            self.start_client_meeting(client, topic)
+
+    def take_break(self, *_):
+        """Pause tracking. Resumes the same project automatically on next activity."""
+        if self.on_break or self.current is None:
+            return
+        self.flush()                       # bank the time worked so far
+        self.break_resume_idx = self.current
+        self.current = None
+        self.on_break = True
+        self.break_started_at = time.time()
+        self.session_seconds = 0
+        self.unsent_seconds = 0
+        self._apply_icon(False)
+        self._refresh_tray()
+
     def stop(self, *_):
+        self.on_break = False
+        self.break_resume_idx = None
+        self.meeting = None
         self.flush()
         self.current = None
         self.session_seconds = 0
@@ -310,9 +449,24 @@ class KlickTime:
 
     def worker(self):
         while not self.stop_flag.wait(1):
-            active = self.current is not None and idle_seconds() < self.idle_limit
+            # On break: stay paused until the employee touches keyboard/mouse again.
+            if self.on_break:
+                self._apply_icon(False)
+                last_input = time.time() - idle_seconds()
+                if self.break_resume_idx is not None and last_input > self.break_started_at + 1.0:
+                    self.current = self.break_resume_idx     # resume same project
+                    self.on_break = False
+                    self.break_resume_idx = None
+                    self.session_seconds = 0
+                    self.unsent_seconds = 0
+                    self._apply_icon(True)
+                    self._refresh_tray()
+                    continue
+                self._set_title("KlickTime — on break (move mouse to resume)")
+                continue
+            active = self._tracking() and idle_seconds() < self.idle_limit
             self._apply_icon(active)              # color when working, gray otherwise
-            if self.current is None:
+            if not self._tracking():
                 self._set_title("KlickTime — not tracking")
                 continue
             if not active:
@@ -323,8 +477,7 @@ class KlickTime:
             if self.unsent_seconds >= 60:
                 self.send(self.unsent_seconds // 60, True)
                 self.unsent_seconds = self.unsent_seconds % 60
-            p = self.projects[self.current]
-            self._set_title(f"KlickTime — {p['name']}  {fmt(self.session_seconds)}")
+            self._set_title(f"KlickTime — {self._current_label()}  {fmt(self.session_seconds)}")
 
     # --- tray ---
     def _set_title(self, text):
@@ -360,9 +513,23 @@ class KlickTime:
             ))
         items.append(pystray.Menu.SEPARATOR)
         items.append(pystray.MenuItem(
+            "Log internal meeting\u2026",
+            (lambda icon, item: self._prompt_internal_meeting()),
+        ))
+        items.append(pystray.MenuItem(
+            "Log client meeting\u2026",
+            (lambda icon, item: self._prompt_client_meeting()),
+            enabled=(lambda item: len(self.clients) > 0),
+        ))
+        items.append(pystray.MenuItem(
+            "Break  [Ctrl+Alt+B]",
+            (lambda icon, item: self.take_break()),
+            enabled=(lambda item: self.current is not None and not self.on_break),
+        ))
+        items.append(pystray.MenuItem(
             "Stop tracking",
             (lambda icon, item: self.stop()),
-            enabled=(lambda item: self.current is not None),
+            enabled=(lambda item: self._tracking() or self.on_break),
         ))
         if self.mode == "shared":
             items.append(pystray.MenuItem(
@@ -412,6 +579,10 @@ class KlickTime:
                 keyboard.add_hotkey(f"ctrl+alt+{i+1}", lambda idx=i: self.select(idx))
             except Exception:
                 pass
+        try:
+            keyboard.add_hotkey("ctrl+alt+b", lambda: self.take_break())
+        except Exception:
+            pass
 
     def run(self):
         while True:
@@ -435,6 +606,9 @@ class KlickTime:
             self.current = None
             self.session_seconds = 0
             self.unsent_seconds = 0
+            self.on_break = False
+            self.break_resume_idx = None
+            self.meeting = None
             self.stop_flag = threading.Event()
             self._icon_is_color = None
 

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import Layout from "../components/Layout";
+import Modal from "../components/Modal";
 import api from "../api/client";
 import { useCollection, extractError } from "../api/hooks";
 import { useAuth } from "../auth/AuthContext";
@@ -27,6 +28,7 @@ const hrs = (m) => Math.round((m / 60) * 100) / 100;
 export default function Time() {
   const { user } = useAuth();
   const { items: projects } = useCollection("/projects/");
+  const { items: clients } = useCollection("/clients/");
   const projectsById = useMemo(() => Object.fromEntries(projects.map((p) => [p.id, p])), [projects]);
 
   const [weekStart, setWeekStart] = useState(() => mondayOf(new Date()));
@@ -34,6 +36,11 @@ export default function Time() {
   const [entryMap, setEntryMap] = useState({});   // "projectId|date" -> {id, minutes}
   const [inputs, setInputs] = useState({});        // "projectId|date" -> "1.5"
   const [loading, setLoading] = useState(true);
+  const [meetings, setMeetings] = useState([]);    // non-project entries this week
+  const [refresh, setRefresh] = useState(0);
+  const [mtgModal, setMtgModal] = useState(false);
+  const [mtg, setMtg] = useState({ type: "INTERNAL_MEETING", entry_date: iso(new Date()), hours: "", description: "" });
+  const [mtgErr, setMtgErr] = useState("");
 
   const days = useMemo(() => DOW.map((_, i) => addDays(weekStart, i)), [weekStart]);
   const key = (pid, d) => `${pid}|${iso(d)}`;
@@ -48,15 +55,21 @@ export default function Time() {
         const r = await api.get(`/time-entries/?user=${user.id}&date_from=${from}&date_to=${to}&page_size=200`);
         const list = r.data.results ?? r.data;
         if (!active) return;
-        const map = {}, inp = {}, ids = new Set();
+        const map = {}, inp = {}, ids = new Set(), mtgs = [];
         for (const e of list) {
-          const k = `${e.project}|${e.entry_date}`;
-          map[k] = { id: e.id, minutes: e.minutes };
-          inp[k] = String(hrs(e.minutes));
-          ids.add(e.project);
+          const type = e.activity_type || "WORK";
+          if (type === "WORK" && e.project) {
+            const k = `${e.project}|${e.entry_date}`;
+            map[k] = { id: e.id, minutes: e.minutes };
+            inp[k] = String(hrs(e.minutes));
+            ids.add(e.project);
+          } else if (type !== "WORK") {
+            mtgs.push(e);
+          }
         }
         setEntryMap(map);
         setInputs(inp);
+        setMeetings(mtgs);
         setRowIds((prev) => Array.from(new Set([...prev, ...ids])));
       } finally {
         if (active) setLoading(false);
@@ -64,7 +77,7 @@ export default function Time() {
     }
     load();
     return () => { active = false; };
-  }, [weekStart, user]);
+  }, [weekStart, user, refresh]);
 
   const minutesOf = (k) => {
     const h = parseFloat(inputs[k]);
@@ -101,6 +114,30 @@ export default function Time() {
   }
 
   const available = projects.filter((p) => !rowIds.includes(p.id) && p.status === "ACTIVE");
+
+  async function saveMeeting(e) {
+    e.preventDefault(); setMtgErr("");
+    const minutes = Math.round(parseFloat(mtg.hours || "0") * 60);
+    if (!minutes || minutes <= 0) { setMtgErr("Enter how long the meeting lasted."); return; }
+    if (!mtg.description.trim()) { setMtgErr("Add a short description."); return; }
+    if (mtg.type === "CLIENT_MEETING" && !mtg.client) { setMtgErr("Choose the client for this meeting."); return; }
+    try {
+      const payload = {
+        activity_type: mtg.type, entry_date: mtg.entry_date, minutes, description: mtg.description,
+      };
+      if (mtg.type === "CLIENT_MEETING") payload.client = Number(mtg.client);
+      await api.post("/time-entries/", payload);
+      setMtgModal(false);
+      setMtg({ type: "INTERNAL_MEETING", entry_date: iso(new Date()), hours: "", description: "" });
+      setRefresh((x) => x + 1);
+    } catch (err) { setMtgErr(extractError(err)); }
+  }
+
+  async function delMeeting(id) {
+    if (!window.confirm("Delete this entry?")) return;
+    try { await api.delete(`/time-entries/${id}/`); setRefresh((x) => x + 1); }
+    catch (err) { alert(extractError(err)); }
+  }
 
   return (
     <Layout>
@@ -185,6 +222,75 @@ export default function Time() {
             {available.map((p) => <option key={p.id} value={p.id}>{p.name} — {p.client_name}</option>)}
           </select>
         </div>
+      )}
+
+      <div className="meeting-section">
+        <div className="meeting-head">
+          <h3>Meetings this week</h3>
+          <button className="btn btn-sm" onClick={() => {
+            setMtg({ type: "INTERNAL_MEETING", entry_date: iso(new Date()), hours: "", description: "" });
+            setMtgErr(""); setMtgModal(true);
+          }}>+ Log a meeting</button>
+        </div>
+        {meetings.length === 0 ? (
+          <div className="empty-row">No meetings logged this week.</div>
+        ) : (
+          <div className="meeting-list">
+            {meetings.map((m) => (
+              <div key={m.id} className="meeting-item">
+                <span className={"badge " + (m.activity_type === "CLIENT_MEETING" ? "yes" : "no")}>{m.activity_label}</span>
+                <span className="meeting-desc">{m.description || "—"}{m.client_name ? ` · ${m.client_name}` : ""}</span>
+                <span className="meeting-date mono">{m.entry_date}</span>
+                <span className="meeting-hrs mono">{hrs(m.minutes)} h</span>
+                <button className="link-btn danger" onClick={() => delMeeting(m.id)}>Delete</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {mtgModal && (
+        <Modal title="Log a meeting" onClose={() => setMtgModal(false)}>
+          <form onSubmit={saveMeeting}>
+            {mtgErr && <div className="error">{mtgErr}</div>}
+            <div className="field">
+              <label>Type</label>
+              <select value={mtg.type} onChange={(e) => setMtg({ ...mtg, type: e.target.value })}>
+                <option value="INTERNAL_MEETING">Internal meeting (non-billable)</option>
+                <option value="CLIENT_MEETING">Client meeting (billable)</option>
+              </select>
+            </div>
+            {mtg.type === "CLIENT_MEETING" && (
+              <div className="field">
+                <label>Client</label>
+                <select value={mtg.client || ""} onChange={(e) => setMtg({ ...mtg, client: e.target.value })}>
+                  <option value="">Select a client…</option>
+                  {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+            )}
+            <div className="form-row">
+              <div className="field">
+                <label>Date</label>
+                <input type="date" value={mtg.entry_date} onChange={(e) => setMtg({ ...mtg, entry_date: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>Hours</label>
+                <input type="number" min="0" step="0.25" value={mtg.hours}
+                  onChange={(e) => setMtg({ ...mtg, hours: e.target.value })} placeholder="e.g. 1.5" />
+              </div>
+            </div>
+            <div className="field">
+              <label>Description</label>
+              <input value={mtg.description} onChange={(e) => setMtg({ ...mtg, description: e.target.value })}
+                placeholder="What was the meeting about?" />
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="btn btn-ghost" onClick={() => setMtgModal(false)}>Cancel</button>
+              <button className="btn">Save</button>
+            </div>
+          </form>
+        </Modal>
       )}
     </Layout>
   );

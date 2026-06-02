@@ -49,15 +49,24 @@ class TimeEntry(OrgScopedModel):
         APPROVED = "APPROVED", "Approved"
         REJECTED = "REJECTED", "Rejected"
 
+    class Activity(models.TextChoices):
+        WORK = "WORK", "Project work"
+        BREAK = "BREAK", "Break"
+        INTERNAL_MEETING = "INTERNAL_MEETING", "Internal meeting"
+        CLIENT_MEETING = "CLIENT_MEETING", "Client meeting"
+
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="time_entries"
     )
+    activity_type = models.CharField(max_length=20, choices=Activity.choices, default=Activity.WORK)
+    # project is required for WORK, empty for breaks/meetings
     project = models.ForeignKey(
-        "projects.Project", on_delete=models.PROTECT, related_name="time_entries"
+        "projects.Project", null=True, blank=True, on_delete=models.PROTECT, related_name="time_entries"
     )
-    # client is copied from the project so client reports stay fast at scale.
+    # client: copied from project for WORK, chosen directly for a CLIENT_MEETING,
+    # and empty for breaks / internal meetings.
     client = models.ForeignKey(
-        "clients.Client", on_delete=models.PROTECT, related_name="time_entries"
+        "clients.Client", null=True, blank=True, on_delete=models.PROTECT, related_name="time_entries"
     )
     timesheet = models.ForeignKey(
         Timesheet, null=True, blank=True,
@@ -89,23 +98,33 @@ class TimeEntry(OrgScopedModel):
         ]
 
     def save(self, *args, **kwargs):
-        # Keep the denormalized client in sync with the chosen project.
-        if self.project_id and not self.client_id:
-            self.client_id = self.project.client_id
-        # On first save, snapshot the rates from the active allocation.
+        # Breaks and internal meetings carry no client/project and are never billable.
+        if self.activity_type in (self.Activity.BREAK, self.Activity.INTERNAL_MEETING):
+            self.project = None
+            self.client = None
+            self.is_billable = False
+        # Project work: keep the denormalized client in sync with the chosen project.
+        elif self.activity_type == self.Activity.WORK:
+            if self.project_id and not self.client_id:
+                self.client_id = self.project.client_id
+        # Client meeting: attaches directly to a client, no project.
+        elif self.activity_type == self.Activity.CLIENT_MEETING:
+            self.project = None
+
+        # On first save, snapshot the rates so changing a rate later never
+        # rewrites old entries. Work uses the project allocation; a client
+        # meeting uses any active allocation under that client (else any).
         if self._state.adding and self.bill_rate is None and self.cost_rate is None:
             from allocations.models import Allocation
-            alloc = (
-                Allocation.objects
-                .filter(
-                    organization_id=self.organization_id,
-                    user_id=self.user_id,
-                    project_id=self.project_id,
-                    is_active=True,
-                )
-                .order_by("-id")
-                .first()
+            base = Allocation.objects.filter(
+                organization_id=self.organization_id, user_id=self.user_id, is_active=True
             )
+            alloc = None
+            if self.activity_type == self.Activity.WORK and self.project_id:
+                alloc = base.filter(project_id=self.project_id).order_by("-id").first()
+            elif self.activity_type == self.Activity.CLIENT_MEETING and self.client_id:
+                alloc = (base.filter(project__client_id=self.client_id).order_by("-id").first()
+                         or base.order_by("-id").first())
             if alloc:
                 self.bill_rate = alloc.bill_rate
                 self.cost_rate = alloc.cost_rate

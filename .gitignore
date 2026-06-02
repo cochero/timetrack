@@ -25,3 +25,10 @@ agent/token.json
 Thumbs.db
 .idea/
 .vscode/
+
+# Build artifacts and packages (never commit these)
+*.zip
+*.exe
+*.spec
+agent/build/
+agent/dist/

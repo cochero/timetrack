@@ -44,7 +44,7 @@ class HoursByClientView(BaseReportView):
     def get(self, request):
         qs, df, dt = self.base_qs(request)
         rows = (
-            qs.values("client_id", "client__name")
+            qs.filter(client__isnull=False).values("client_id", "client__name")
             .annotate(
                 total=Sum("minutes"),
                 billable=Sum("minutes", filter=Q(is_billable=True)),
@@ -86,7 +86,7 @@ class HoursByProjectView(BaseReportView):
     def get(self, request):
         qs, df, dt = self.base_qs(request)
         rows = (
-            qs.values("project_id", "project__name", "client__name")
+            qs.filter(project__isnull=False).values("project_id", "project__name", "client__name")
             .annotate(
                 total=Sum("minutes"),
                 billable=Sum("minutes", filter=Q(is_billable=True)),
@@ -191,7 +191,7 @@ class BillingExportView(BaseReportView):
         client_filter = request.query_params.get("client")
         if client_filter:
             qs = qs.filter(client_id=client_filter)
-        qs = qs.select_related("client")
+        qs = qs.filter(client__isnull=False).select_related("client")
 
         groups = {}
         for e in qs:

@@ -262,3 +262,27 @@ table.matrix thead th { background: #faf8f4; font-size: 11.5px; text-transform: 
 .login-divider::before, .login-divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 .ok-note { background: var(--accent-soft); color: #0b5e4d; border-radius: 8px; padding: 10px 12px; font-size: 13px; margin-bottom: 12px; }
 .linklike { background: none; border: none; color: var(--accent); font: inherit; cursor: pointer; padding: 0; text-decoration: underline; }
+
+/* ---------- Projects as a larger card list ---------- */
+.project-list { display: flex; flex-direction: column; gap: 12px; }
+.project-row { display: flex; align-items: center; gap: 20px; background: var(--surface); border: 1px solid var(--line);
+  border-left: 4px solid var(--line); border-radius: 12px; padding: 18px 22px; box-shadow: var(--shadow); }
+.project-row.is-active { border-left-color: #1aa179; background: linear-gradient(0deg, var(--surface), var(--surface)); }
+.project-row.is-active .project-name { color: #0d7a59; }
+.project-main { flex: 1; min-width: 0; }
+.project-name { font-size: 18px; font-weight: 600; color: var(--ink); }
+.project-code { font-family: var(--font-mono); font-size: 13px; font-weight: 400; color: var(--muted); }
+.project-sub { font-size: 14px; color: var(--muted); margin-top: 3px; }
+.project-tags { display: flex; gap: 8px; align-items: center; }
+.project-row.is-active .badge.active { background: #d6f5e9; color: #0d7a59; }
+
+/* ---------- Meetings section (Time page) ---------- */
+.meeting-section { margin-top: 30px; }
+.meeting-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.meeting-head h3 { font-size: 16px; margin: 0; color: var(--ink); }
+.meeting-list { display: flex; flex-direction: column; gap: 8px; }
+.meeting-item { display: flex; align-items: center; gap: 14px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; padding: 12px 16px; }
+.meeting-desc { flex: 1; min-width: 0; color: var(--ink); }
+.meeting-date { color: var(--muted); font-size: 13px; }
+.meeting-hrs { font-weight: 600; }

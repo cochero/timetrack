@@ -35,6 +35,16 @@ The installer:
 Give employees **KlickTimeSetup.exe**. They run it, accept the options, and
 KlickTime installs and starts. On first launch they sign in once.
 
+
+
+## Tray menu options (KlickTime)
+- Project buttons (Ctrl+Alt+1..9) — start/switch the project being tracked.
+- Break (Ctrl+Alt+B) — pause; resumes the same project automatically when you
+  return and use the keyboard or mouse.
+- Log internal meeting… — asks for a description; tracks non-billable time.
+- Log client meeting… — pick a client and topic; tracks billable time to that client.
+- Stop tracking, and (shared mode) Sign out / switch user.
+
 ## Privacy
 KlickTime sends app/window titles and active minutes only — no keystrokes,
 screenshots, or passwords. It is visible (tray icon) and announces itself.
