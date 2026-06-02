@@ -91,6 +91,15 @@ class Session:
         r.raise_for_status()
         d = r.json(); self.access, self.refresh = d["access"], d["refresh"]; self._save()
 
+    def forget(self):
+        self.access = None
+        self.refresh = None
+        try:
+            if os.path.exists(TOKEN_PATH):
+                os.remove(TOKEN_PATH)
+        except Exception:
+            pass
+
     def try_token(self):
         if not os.path.exists(TOKEN_PATH):
             return False
@@ -124,15 +133,99 @@ class Session:
         r.raise_for_status(); return r.json()
 
 
-# ---------------- Login dialog (first run) ----------------
-def ask_login():
+# ---------------- Login window (first run) ----------------
+def _logo_photo(tk, size=76):
+    """A sized PhotoImage of the embedded KE logo, no ImageTk needed."""
+    from PIL import Image
+    im = Image.open(io.BytesIO(base64.b64decode(LOGO_B64))).convert("RGBA").resize((size, size), Image.LANCZOS)
+    buf = io.BytesIO(); im.save(buf, format="PNG")
+    return tk.PhotoImage(data=base64.b64encode(buf.getvalue()))
+
+
+def interactive_login(session):
+    """A branded sign-in window. Returns True on success, False if cancelled."""
     import tkinter as tk
-    from tkinter import simpledialog
-    root = tk.Tk(); root.withdraw()
-    email = simpledialog.askstring("KlickTime", "Your work email:")
-    pwd = simpledialog.askstring("KlickTime", "Your password:", show="*")
-    root.destroy()
-    return email, pwd
+    result = {"ok": False}
+
+    win = tk.Tk()
+    win.title("KlickTime")
+    win.configure(bg="#ffffff")
+    win.resizable(False, False)
+    W, H = 400, 540
+    sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
+    win.geometry(f"{W}x{H}+{(sw - W)//2}+{max(0,(sh - H)//3)}")
+
+    # Dark branded header
+    head = tk.Frame(win, bg="#14181b", height=196)
+    head.pack(fill="x"); head.pack_propagate(False)
+    try:
+        photo = _logo_photo(tk, 76)
+        lg = tk.Label(head, image=photo, bg="#14181b"); lg.image = photo
+        lg.pack(pady=(34, 8))
+    except Exception:
+        tk.Label(head, text="K", bg="#14181b", fg="#1bbf9a",
+                 font=("Segoe UI", 34, "bold")).pack(pady=(42, 4))
+    tk.Label(head, text="KlickTime", bg="#14181b", fg="#ffffff",
+             font=("Segoe UI Semibold", 18)).pack()
+    tk.Label(head, text="Time tracking by Klickevents", bg="#14181b", fg="#8aa0a8",
+             font=("Segoe UI", 9)).pack(pady=(2, 0))
+
+    body = tk.Frame(win, bg="#ffffff")
+    body.pack(fill="both", expand=True, padx=36, pady=(24, 8))
+    tk.Label(body, text="Sign in to continue", bg="#ffffff", fg="#14181b",
+             font=("Segoe UI Semibold", 13)).pack(anchor="w")
+
+    def make_field(label, show=None):
+        tk.Label(body, text=label, bg="#ffffff", fg="#5c6b73",
+                 font=("Segoe UI", 9)).pack(anchor="w", pady=(16, 4))
+        e = tk.Entry(body, font=("Segoe UI", 11), relief="solid", bd=1,
+                     highlightthickness=1, highlightcolor="#0e7c66",
+                     highlightbackground="#d4dce0")
+        if show:
+            e.config(show=show)
+        e.pack(fill="x", ipady=6)
+        return e
+
+    email = make_field("Work email")
+    pwd = make_field("Password", show="\u2022")
+
+    err = tk.Label(body, text="", bg="#ffffff", fg="#c0392b", font=("Segoe UI", 9),
+                   wraplength=320, justify="left")
+    err.pack(anchor="w", pady=(10, 0))
+
+    def submit(*_):
+        e, p = email.get().strip(), pwd.get()
+        if not e or not p:
+            err.config(text="Please enter your email and password.")
+            return
+        btn.config(state="disabled", text="Signing in\u2026"); win.update()
+        try:
+            session.login(e, p)
+            result["ok"] = True
+            win.destroy()
+        except Exception as ex:
+            msg = "Invalid email or password."
+            try:
+                if isinstance(ex, requests.exceptions.ConnectionError):
+                    msg = "Can't reach the server. Check your connection."
+            except Exception:
+                pass
+            err.config(text=msg)
+            btn.config(state="normal", text="Sign in")
+
+    btn = tk.Button(body, text="Sign in", command=submit, bg="#0e7c66", fg="#ffffff",
+                    activebackground="#0b6353", activeforeground="#ffffff", relief="flat",
+                    font=("Segoe UI Semibold", 11), cursor="hand2")
+    btn.pack(fill="x", ipady=9, pady=(22, 0))
+
+    host = session.base.replace("https://", "").replace("http://", "")
+    tk.Label(win, text=f"Server: {host}", bg="#ffffff", fg="#9aa7ad",
+             font=("Segoe UI", 8)).pack(side="bottom", pady=10)
+
+    win.bind("<Return>", submit)
+    email.focus_set()
+    win.mainloop()
+    return result["ok"]
 
 
 def fmt(sec):
@@ -144,6 +237,7 @@ def fmt(sec):
 class KlickTime:
     def __init__(self, cfg):
         self.s = Session(cfg["server_url"])
+        self.mode = str(cfg.get("mode", "dedicated")).lower()   # "dedicated" or "shared"
         self.projects = []
         self.idle_limit = 5 * 60          # seconds; refreshed from server
         self.current = None               # index into self.projects, or None
@@ -159,11 +253,7 @@ class KlickTime:
     def authenticate(self):
         if self.s.try_token():
             return True
-        email, pwd = ask_login()
-        if not email or not pwd:
-            return False
-        self.s.login(email, pwd)
-        return True
+        return interactive_login(self.s)
 
     def load_data(self):
         org = self.s.get("/api/org/")
@@ -248,19 +338,38 @@ class KlickTime:
             if self.current is None:
                 self._set_title("KlickTime — not tracking")
 
+    def _make_select(self, idx):
+        def handler(icon, item):
+            self.select(idx)
+        return handler
+
+    def _make_checked(self, idx):
+        def checker(item):
+            return self.current == idx
+        return checker
+
     def _menu(self):
         items = []
         for i, p in enumerate(self.projects):
             label = f"{p['name']} · {p.get('client_name','')}   [Ctrl+Alt+{i+1}]"
             items.append(pystray.MenuItem(
                 label,
-                (lambda _icon, _item, idx=i: self.select(idx)),
-                checked=(lambda _item, idx=i: self.current == idx),
+                self._make_select(i),
+                checked=self._make_checked(i),
                 radio=True,
             ))
         items.append(pystray.Menu.SEPARATOR)
-        items.append(pystray.MenuItem("Stop tracking", self.stop, enabled=lambda _i: self.current is not None))
-        items.append(pystray.MenuItem("Quit", self._quit))
+        items.append(pystray.MenuItem(
+            "Stop tracking",
+            (lambda icon, item: self.stop()),
+            enabled=(lambda item: self.current is not None),
+        ))
+        if self.mode == "shared":
+            items.append(pystray.MenuItem(
+                "Sign out / switch user",
+                (lambda icon, item: self._sign_out()),
+            ))
+        items.append(pystray.MenuItem("Quit", (lambda icon, item: self._quit())))
         return pystray.Menu(*items)
 
     def _build_icons(self):
@@ -287,6 +396,16 @@ class KlickTime:
         if self.icon:
             self.icon.stop()
 
+    def _sign_out(self, *_):
+        """Shared mode: finalize current time, forget the user, return to login."""
+        self.flush()
+        self.current = None
+        self.s.forget()
+        self._signed_out = True      # tells run() to loop back to the login window
+        self.stop_flag.set()
+        if self.icon:
+            self.icon.stop()
+
     def _bind_hotkeys(self):
         for i in range(len(self.projects)):
             try:
@@ -295,21 +414,44 @@ class KlickTime:
                 pass
 
     def run(self):
-        if not self.authenticate():
-            return
-        self.load_data()
-        if not self.projects:
-            import tkinter as tk
-            from tkinter import messagebox
-            r = tk.Tk(); r.withdraw()
-            messagebox.showinfo("KlickTime", "No projects are assigned to you yet. Ask your manager to allocate you to a project.")
-            r.destroy(); return
-        self._build_icons()
-        threading.Thread(target=self.worker, daemon=True).start()
-        self._bind_hotkeys()
-        self.icon = pystray.Icon("KlickTime", self.img_gray, "KlickTime — not tracking", menu=self._menu())
-        self._icon_is_color = False
-        self.icon.run()
+        while True:
+            self._signed_out = False
+            if not self.authenticate():
+                return
+            self.load_data()
+            if not self.projects:
+                import tkinter as tk
+                from tkinter import messagebox
+                r = tk.Tk(); r.withdraw()
+                messagebox.showinfo("KlickTime", "No projects are assigned to you yet. Ask your manager to allocate you to a project.")
+                r.destroy()
+                # In shared mode, let the next person try; in dedicated, exit.
+                if self.mode == "shared":
+                    self.s.forget()
+                    continue
+                return
+
+            # fresh per-session state
+            self.current = None
+            self.session_seconds = 0
+            self.unsent_seconds = 0
+            self.stop_flag = threading.Event()
+            self._icon_is_color = None
+
+            self._build_icons()
+            threading.Thread(target=self.worker, daemon=True).start()
+            self._bind_hotkeys()
+            self.icon = pystray.Icon("KlickTime", self.img_gray, "KlickTime — not tracking", menu=self._menu())
+            self._icon_is_color = False
+            self.icon.run()
+
+            # tray has stopped: either a real quit, or a sign-out (loop back to login)
+            try:
+                keyboard.unhook_all()
+            except Exception:
+                pass
+            if not self._signed_out:
+                return
 
 
 def main():
