@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 
 export default function Login() {
@@ -53,6 +53,8 @@ export default function Login() {
                    placeholder="••••••••" required />
           </div>
           <button className="btn" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
+          <div className="login-divider"><span>or</span></div>
+          <Link to="/download" className="btn btn-outline">Download KlickTime app</Link>
         </form>
       </div>
     </div>

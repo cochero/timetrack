@@ -1,27 +1,44 @@
 # TimeTrack Desktop Agents (Windows)
 
-Two ways for employees to track time without the browser:
+## KlickTime — system-tray work timer
+`klicktime.py` builds into **KlickTime.exe**: a tray app showing each employee's
+assigned projects with hotkeys (Ctrl+Alt+1..9). Click or press a project to
+start; switch in one tap; the KE logo is colour while tracking, grey when idle
+or stopped. Active minutes go to the server and into that day's hours.
 
-## KlickTime (recommended) — system-tray app with hotkeys
-`klicktime.py` → builds into **KlickTime.exe**. Lives in the system tray, shows
-the employee's assigned projects with hotkeys (Ctrl+Alt+1..9). Click or press a
-project to start; switch projects in one tap; auto-pauses after the firm's idle
-timeout (set by the admin). Sends active minutes to the server, which adds them
-to that day's hours — same data as the web app.
+Modes (set in config.json or chosen during install):
+- **dedicated** — one employee per PC; signs in once and stays signed in.
+- **shared** — multiple employees per PC; a "Sign out / switch user" option in
+  the tray lets the next person sign in at shift change.
 
-**Build KlickTime.exe (on a Windows PC with Python installed):**
+### A. Build KlickTime.exe (on a Windows PC with Python)
 1. Open a terminal in this `agent` folder.
-2. Double-click `build_KlickTime.bat` (or run it).
-3. The result is `dist\KlickTime.exe`.
-4. Put `KlickTime.exe` and a `config.json` (copy `config.example.json`, set your
-   server URL) together on each employee PC. Double-click to run.
+2. Run `build_KlickTime.bat`.
+3. Result: `dist\KlickTime.exe` (with the KE icon).
 
-First run asks for the employee's login once (stores only a token after).
+### B. Build the installer KlickTimeSetup.exe (with Inno Setup)
+1. Install **Inno Setup** (free) from jrsoftware.org.
+2. Make sure step A is done (so `dist\KlickTime.exe` exists).
+3. Open `KlickTime.iss` in Inno Setup and click **Build > Compile**
+   (or run `ISCC.exe KlickTime.iss` from a terminal).
+4. Result: **KlickTimeSetup.exe** in this folder.
 
-## timetrack_agent.py — simple console version
-A no-frills console tracker (same server, no tray/hotkeys). Useful for testing.
+The installer:
+- installs to the user's folder (no admin rights needed),
+- offers "start automatically when I sign in to Windows" (auto-start),
+- offers a "shared by multiple employees (shift mode)" checkbox that writes the
+  correct mode into config.json,
+- creates Start Menu (and optional desktop) shortcuts,
+- includes an uninstaller.
+
+### C. Distribute
+Give employees **KlickTimeSetup.exe**. They run it, accept the options, and
+KlickTime installs and starts. On first launch they sign in once.
 
 ## Privacy
-Both send app/window titles + active minutes only — no keystrokes, screenshots,
-or passwords. They announce themselves and are not hidden. Inform employees and
-follow local consent rules. Idle timeout is configured by the admin per firm.
+KlickTime sends app/window titles and active minutes only — no keystrokes,
+screenshots, or passwords. It is visible (tray icon) and announces itself.
+Inform employees and follow local consent rules.
+
+## timetrack_agent.py
+A simple console tracker (no tray/hotkeys) — handy for testing the server.

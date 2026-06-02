@@ -1,1 +1,4 @@
-{ "server_url": "https://tt.klickevents.in" }
+{
+  "server_url": "https://tt.klickevents.in",
+  "mode": "dedicated"
+}

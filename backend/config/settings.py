@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     "timetracking",
     "reports",
     "monitoring",
+    "downloads",
 ]
 
 MIDDLEWARE = [
@@ -135,3 +136,6 @@ if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
+
+# Path on disk to the compiled KlickTime installer served by the public download page.
+KLICKTIME_INSTALLER_PATH = env("KLICKTIME_INSTALLER_PATH", default=str(BASE_DIR / "downloads_store" / "KlickTimeSetup.exe"))

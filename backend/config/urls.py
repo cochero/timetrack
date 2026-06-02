@@ -11,4 +11,5 @@ urlpatterns = [
     path("api/", include("timetracking.urls")),
     path("api/", include("reports.urls")),
     path("api/", include("monitoring.urls")),
+    path("api/", include("downloads.urls")),
 ]
