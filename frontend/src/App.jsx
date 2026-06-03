@@ -10,6 +10,7 @@ import Time from "./pages/Time";
 import Reports from "./pages/Reports";
 import People from "./pages/People";
 import Allocations from "./pages/Allocations";
+import Activity from "./pages/Activity";
 
 const protect = (el) => <ProtectedRoute>{el}</ProtectedRoute>;
 
@@ -27,6 +28,7 @@ export default function App() {
           <Route path="/reports" element={protect(<Reports />)} />
           <Route path="/people" element={protect(<People />)} />
           <Route path="/allocations" element={protect(<Allocations />)} />
+          <Route path="/activity" element={protect(<Activity />)} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

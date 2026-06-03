@@ -3,7 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
 
-from common.permissions import IsAuthenticatedInOrg
+from common.permissions import IsAuthenticatedInOrg, IsManager
 from timetracking.models import TimeEntry
 from .models import ActivitySample
 
@@ -99,3 +99,88 @@ class HeartbeatView(APIView):
                 logged, entry_id = minutes, entry.id
 
         return Response({"ok": True, "logged_minutes": logged, "entry_id": entry_id})
+
+
+class ActivityFeedView(APIView):
+    """Manager view: one employee's day of activity, grouped into readable blocks.
+
+    Consecutive samples on the same application are merged into a single block
+    with a time span and the active minutes within it, so a manager sees a
+    timeline (e.g. '09:10–09:48  Chrome  · project dashboard  · 36 min active')
+    rather than dozens of one-minute rows.
+    """
+    permission_classes = [IsAuthenticatedInOrg, IsManager]
+
+    def get(self, request):
+        import datetime
+        from collections import Counter
+        from django.utils import timezone
+        from accounts.models import User
+
+        u = request.user
+        user_id = request.query_params.get("user")
+        date_str = request.query_params.get("date")
+        if not user_id or not date_str:
+            raise ValidationError("Both 'user' and 'date' are required.")
+        try:
+            d = datetime.date.fromisoformat(date_str)
+        except ValueError:
+            raise ValidationError("date must be YYYY-MM-DD.")
+
+        # employee must belong to the manager's organization
+        try:
+            emp = User.objects.get(id=user_id, organization_id=u.organization_id)
+        except (User.DoesNotExist, ValueError, TypeError):
+            raise ValidationError("Unknown employee.")
+
+        tz = timezone.get_current_timezone()
+        start = timezone.make_aware(datetime.datetime(d.year, d.month, d.day, 0, 0), tz)
+        end = start + datetime.timedelta(days=1)
+        samples = list(ActivitySample.objects.filter(
+            organization_id=u.organization_id, user_id=emp.id,
+            captured_at__gte=start, captured_at__lt=end,
+        ).order_by("captured_at"))
+
+        blocks = []
+        cur = None
+        for s in samples:
+            local = timezone.localtime(s.captured_at)
+            app = s.app or "(unknown)"
+            if cur and cur["_app"] == app:
+                cur["end"] = local.strftime("%H:%M")
+                cur["active_minutes"] += s.minutes
+                if s.window_title:
+                    cur["_titles"].append(s.window_title)
+            else:
+                if cur:
+                    blocks.append(cur)
+                cur = {
+                    "_app": app, "app": app,
+                    "start": local.strftime("%H:%M"), "end": local.strftime("%H:%M"),
+                    "active_minutes": s.minutes,
+                    "_titles": [s.window_title] if s.window_title else [],
+                }
+        if cur:
+            blocks.append(cur)
+
+        # finalize: pick a representative window title, drop internals
+        for b in blocks:
+            titles = [t for t in b.pop("_titles") if t]
+            b.pop("_app", None)
+            b["window_title"] = Counter(titles).most_common(1)[0][0] if titles else ""
+
+        # day summary: total active minutes and the top apps by active minutes
+        app_totals = Counter()
+        total_active = 0
+        for s in samples:
+            total_active += s.minutes
+            app_totals[s.app or "(unknown)"] += s.minutes
+        top_apps = [{"app": a, "active_minutes": m} for a, m in app_totals.most_common(8)]
+
+        return Response({
+            "employee": {"id": emp.id, "name": emp.full_name or emp.email},
+            "date": date_str,
+            "total_active_minutes": total_active,
+            "top_apps": top_apps,
+            "blocks": blocks,
+        })
