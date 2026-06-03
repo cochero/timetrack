@@ -139,3 +139,8 @@ if not DEBUG:
 
 # Path on disk to the compiled KlickTime installer served by the public download page.
 KLICKTIME_INSTALLER_PATH = env("KLICKTIME_INSTALLER_PATH", default=str(BASE_DIR / "downloads_store" / "KlickTimeSetup.exe"))
+
+# KlickTime desktop app: the latest released version. Bump this (or set the
+# KLICKTIME_LATEST_VERSION env var) when you publish a new installer, so running
+# apps are told an update is available.
+KLICKTIME_LATEST_VERSION = env("KLICKTIME_LATEST_VERSION", default="1.1.0")

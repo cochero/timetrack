@@ -50,6 +50,8 @@ else:
 CONFIG_PATH = os.path.join(HERE, "config.json")
 TOKEN_PATH = os.path.join(HERE, "klicktime_token.json")
 HEARTBEAT_PATH = "/api/agent/heartbeat/"
+VERSION_PATH = "/api/klicktime/version/"
+APP_VERSION = "1.1.0"      # bump on each release; compared against the server's value
 
 
 # ---------------- Windows activity detection ----------------
@@ -236,6 +238,20 @@ def interactive_login(session):
 def fmt(sec):
     sec = int(sec); h = sec // 3600; m = (sec % 3600) // 60; s = sec % 60
     return f"{h}:{m:02d}:{s:02d}"
+
+
+def _version_tuple(v):
+    out = []
+    for x in str(v).split("."):
+        try:
+            out.append(int(x))
+        except Exception:
+            out.append(0)
+    return tuple(out)
+
+
+def _version_gt(a, b):
+    return _version_tuple(a) > _version_tuple(b)
 
 
 def _branded_window(meeting_type, height=300):
@@ -429,6 +445,9 @@ class KlickTime:
         self.break_resume_idx = None
         self.break_started_at = 0.0
         self.meeting = None      # None, or {"type","description","client_id","client_name","entry_id"}
+        self.update_available = False
+        self.latest_version = ""
+        self._last_update_check = 0.0
 
     # --- setup ---
     def authenticate(self):
@@ -523,6 +542,38 @@ class KlickTime:
         self._apply_icon(True)
         self._refresh_tray()
 
+    def _check_update(self):
+        """Ask the server for the latest version; notify if newer than this app."""
+        try:
+            data = self.s.get(VERSION_PATH)
+            latest = str(data.get("version", "")).strip()
+            if latest and _version_gt(latest, APP_VERSION):
+                self.update_available = True
+                self.latest_version = latest
+                self._refresh_tray()
+                try:
+                    if self.icon:
+                        self.icon.notify(
+                            f"KlickTime {latest} is available. Open the tray menu to update.",
+                            "Update available")
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    def _open_download(self, *_):
+        import webbrowser
+        try:
+            webbrowser.open(self.s.base.rstrip("/") + "/download")
+        except Exception:
+            pass
+
+    def _suspend_hotkeys(self):
+        try:
+            keyboard.unhook_all()
+        except Exception:
+            pass
+
     def _prompt_internal_meeting(self, *_):
         res = _run_dialog_subprocess("internal")
         if res and res.get("description"):
@@ -575,6 +626,10 @@ class KlickTime:
 
     def worker(self):
         while not self.stop_flag.wait(1):
+            # Daily update check (also runs shortly after sign-in).
+            if time.time() - self._last_update_check > 86400:
+                self._last_update_check = time.time()
+                threading.Thread(target=self._check_update, daemon=True).start()
             # On break: stay paused until the employee touches keyboard/mouse again.
             if self.on_break:
                 self._apply_icon(False)
@@ -629,6 +684,12 @@ class KlickTime:
 
     def _menu(self):
         items = []
+        if self.update_available:
+            items.append(pystray.MenuItem(
+                f"\u2b06 Update to {self.latest_version} \u2014 download",
+                (lambda icon, item: self._open_download()),
+            ))
+            items.append(pystray.Menu.SEPARATOR)
         for i, p in enumerate(self.projects):
             label = f"{p['name']} · {p.get('client_name','')}   [Ctrl+Alt+{i+1}]"
             items.append(pystray.MenuItem(
@@ -735,6 +796,7 @@ class KlickTime:
             self.on_break = False
             self.break_resume_idx = None
             self.meeting = None
+            self._last_update_check = 0.0      # check for updates soon after sign-in
             self.stop_flag = threading.Event()
             self._icon_is_color = None
 

@@ -76,3 +76,18 @@ class DownloadFileView(APIView):
         if not path or not os.path.exists(path):
             raise Http404("Installer is not available yet.")
         return FileResponse(open(path, "rb"), as_attachment=True, filename="KlickTimeSetup.exe")
+
+
+class LatestVersionView(APIView):
+    """Tells the KlickTime desktop app the latest released version.
+
+    The version itself is a single setting (KLICKTIME_LATEST_VERSION) so a
+    release is just one value to change. Public so the app can check freely.
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response({
+            "version": getattr(settings, "KLICKTIME_LATEST_VERSION", "1.0.0"),
+            "download_url": "/download",
+        })
