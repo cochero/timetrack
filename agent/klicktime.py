@@ -41,7 +41,12 @@ except Exception:
 LOGO_B64 = "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"
 
 IS_WINDOWS = platform.system() == "Windows"
-HERE = os.path.dirname(os.path.abspath(__file__))
+# Locate config/token next to the actual program: the install folder when frozen
+# (so the installer's settings and the saved login persist), else the source folder.
+if getattr(sys, "frozen", False):
+    HERE = os.path.dirname(sys.executable)
+else:
+    HERE = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(HERE, "config.json")
 TOKEN_PATH = os.path.join(HERE, "klicktime_token.json")
 HEARTBEAT_PATH = "/api/agent/heartbeat/"
@@ -233,54 +238,175 @@ def fmt(sec):
     return f"{h}:{m:02d}:{s:02d}"
 
 
-def ask_client_meeting(clients):
-    """Popup to pick a client and enter a topic. Returns (client_dict, topic) or (None, '')."""
+def _branded_window(meeting_type, height=300):
+    """Create a styled KlickTime window. Header shows the meeting type. Returns (win, body)."""
+    import tkinter as tk
+    win = tk.Tk()
+    win.title("KlickTime")
+    win.configure(bg="#ffffff")
+    win.resizable(False, False)
+    W, H = 440, height
+    sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
+    win.geometry(f"{W}x{H}+{(sw - W)//2}+{max(0,(sh - H)//3)}")
+    try:
+        ic = _logo_photo(tk, 32)
+        win.iconphoto(True, ic)
+        win._icon_ref = ic
+    except Exception:
+        pass
+
+    head = tk.Frame(win, bg="#14181b", height=96)
+    head.pack(fill="x"); head.pack_propagate(False)
+    row = tk.Frame(head, bg="#14181b"); row.pack(expand=True, fill="both", padx=28)
+    try:
+        photo = _logo_photo(tk, 42)
+        lg = tk.Label(row, image=photo, bg="#14181b"); lg.image = photo
+        lg.pack(side="left", pady=26, padx=(0, 14))
+    except Exception:
+        pass
+    txt = tk.Frame(row, bg="#14181b"); txt.pack(side="left", anchor="center")
+    tk.Label(txt, text="KLICKTIME", bg="#14181b", fg="#7fd8c0",
+             font=("Segoe UI", 8, "bold")).pack(anchor="w")
+    tk.Label(txt, text=meeting_type, bg="#14181b", fg="#ffffff",
+             font=("Segoe UI Semibold", 16)).pack(anchor="w")
+
+    body = tk.Frame(win, bg="#ffffff")
+    body.pack(fill="both", expand=True, padx=32, pady=(24, 26))
+    return win, body
+
+
+def _force_foreground_win(win):
+    """On Windows, claim the foreground so a tray-launched window can take input."""
+    try:
+        import ctypes
+        win.update_idletasks()
+        user32 = ctypes.windll.user32
+        kernel32 = ctypes.windll.kernel32
+        hwnd = win.winfo_id()
+        parent = user32.GetParent(hwnd) or hwnd
+        fg = user32.GetForegroundWindow()
+        cur = kernel32.GetCurrentThreadId()
+        tgt = user32.GetWindowThreadProcessId(fg, 0)
+        user32.AttachThreadInput(cur, tgt, True)
+        user32.BringWindowToTop(parent)
+        user32.SetForegroundWindow(parent)
+        user32.SetActiveWindow(parent)
+        user32.SetFocus(parent)
+        user32.AttachThreadInput(cur, tgt, False)
+    except Exception:
+        pass
+
+
+def _focus_window(win, first_widget=None):
+    """Force the window to the front and give it keyboard focus (fixes no-typing).
+
+    Must run AFTER the event loop has started, so it is scheduled with after().
+    """
+    def grab():
+        try:
+            win.attributes("-topmost", True)
+            win.lift()
+            win.focus_force()
+            _force_foreground_win(win)          # Windows: actually claim foreground
+            if first_widget is not None:
+                first_widget.focus_set()
+            win.after(600, lambda: win.attributes("-topmost", False))
+        except Exception:
+            pass
+    win.after(120, grab)
+
+
+def _field_label(body, text):
+    import tkinter as tk
+    tk.Label(body, text=text, bg="#ffffff", fg="#5c6b73",
+             font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(2, 6))
+
+
+def _styled_entry(body):
+    import tkinter as tk
+    wrap = tk.Frame(body, bg="#e0ddd4", padx=1, pady=1)   # 1px border
+    wrap.pack(fill="x")
+    e = tk.Entry(wrap, font=("Segoe UI", 11), relief="flat", bd=0, bg="#ffffff")
+    e.pack(fill="x", ipady=8, ipadx=8)
+    return e
+
+
+def _accent_button(body, text, command):
+    import tkinter as tk
+    return tk.Button(body, text=text, command=command, bg="#0e7c66", fg="#ffffff",
+                     activebackground="#0b6353", activeforeground="#ffffff", relief="flat",
+                     font=("Segoe UI Semibold", 11), cursor="hand2", bd=0)
+
+
+def ask_text(title, prompt):
+    """Branded popup to capture a meeting description. Returns trimmed text or ''."""
     try:
         import tkinter as tk
+        result = {"val": ""}
+        win, body = _branded_window("Internal meeting", height=300)
+        _field_label(body, prompt)
+        entry = _styled_entry(body)
+
+        def ok(*_):
+            result["val"] = entry.get().strip()
+            win.destroy()
+
+        btn = _accent_button(body, "Start meeting", ok)
+        btn.pack(fill="x", ipady=11, side="bottom")
+        win.bind("<Return>", ok)
+        _focus_window(win, entry)
+        win.mainloop()
+        return result["val"]
+    except Exception:
+        return ""
+
+
+def ask_client_meeting(clients):
+    """Branded popup to pick a client and topic. Returns (client_dict, topic) or (None, '')."""
+    try:
+        import tkinter as tk
+        from tkinter import ttk
         result = {"client": None, "topic": ""}
-        win = tk.Tk()
-        win.title("Client meeting")
-        win.configure(bg="#ffffff")
-        win.resizable(False, False)
-        W, H = 360, 230
-        sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
-        win.geometry(f"{W}x{H}+{(sw - W)//2}+{max(0,(sh - H)//3)}")
+        win, body = _branded_window("Client meeting", height=400)
 
-        tk.Label(win, text="Client", bg="#ffffff", fg="#5c6b73", font=("Segoe UI", 9)).pack(anchor="w", padx=24, pady=(20, 4))
-        names = [c["name"] for c in clients]
-        var = tk.StringVar(value=names[0] if names else "")
-        tk.OptionMenu(win, var, *(names or [""])).pack(fill="x", padx=24)
+        style = ttk.Style(win)
+        try:
+            style.theme_use("clam")
+        except Exception:
+            pass
+        style.configure("KT.TCombobox", fieldbackground="#ffffff", background="#ffffff",
+                        bordercolor="#e0ddd4", arrowcolor="#14181b", padding=8, relief="flat")
+        style.map("KT.TCombobox", fieldbackground=[("readonly", "#ffffff")])
 
-        tk.Label(win, text="Meeting topic", bg="#ffffff", fg="#5c6b73", font=("Segoe UI", 9)).pack(anchor="w", padx=24, pady=(14, 4))
-        topic = tk.Entry(win, font=("Segoe UI", 11), relief="solid", bd=1)
-        topic.pack(fill="x", padx=24, ipady=5)
-
-        def ok():
+        # Button pinned to the bottom first, so it is always visible.
+        def ok(*_):
             sel = var.get()
             result["client"] = next((c for c in clients if c["name"] == sel), None)
             result["topic"] = topic.get().strip()
             win.destroy()
 
-        tk.Button(win, text="Start meeting", command=ok, bg="#0e7c66", fg="#ffffff",
-                  relief="flat", font=("Segoe UI Semibold", 10), cursor="hand2").pack(fill="x", padx=24, pady=18, ipady=6)
-        topic.focus_set()
+        btn = _accent_button(body, "Start meeting", ok)
+        btn.pack(fill="x", ipady=11, side="bottom")
+
+        _field_label(body, "Client")
+        names = [c["name"] for c in clients]
+        var = tk.StringVar(value=names[0] if names else "")
+        cb = ttk.Combobox(body, textvariable=var, values=names, state="readonly",
+                          style="KT.TCombobox", font=("Segoe UI", 11))
+        cb.pack(fill="x", ipady=4)
+        if names:
+            cb.current(0)
+
+        tk.Frame(body, bg="#ffffff", height=14).pack()
+        _field_label(body, "Meeting topic")
+        topic = _styled_entry(body)
+
+        win.bind("<Return>", ok)
+        _focus_window(win, topic)
         win.mainloop()
         return result["client"], result["topic"]
     except Exception:
         return None, ""
-
-
-def ask_text(title, prompt):
-    """Small popup to capture a meeting description. Returns trimmed text or ''."""
-    try:
-        import tkinter as tk
-        from tkinter import simpledialog
-        root = tk.Tk(); root.withdraw()
-        val = simpledialog.askstring(title, prompt)
-        root.destroy()
-        return (val or "").strip()
-    except Exception:
-        return ""
 
 
 # ---------------- The app ----------------
@@ -398,9 +524,9 @@ class KlickTime:
         self._refresh_tray()
 
     def _prompt_internal_meeting(self, *_):
-        desc = ask_text("Internal meeting", "What is the meeting about?")
-        if desc:
-            self.start_internal_meeting(desc)
+        res = _run_dialog_subprocess("internal")
+        if res and res.get("description"):
+            self.start_internal_meeting(res["description"])
 
     def start_client_meeting(self, client, topic):
         self.on_break = False
@@ -419,9 +545,9 @@ class KlickTime:
     def _prompt_client_meeting(self, *_):
         if not self.clients:
             return
-        client, topic = ask_client_meeting(self.clients)
-        if client and topic:
-            self.start_client_meeting(client, topic)
+        res = _run_dialog_subprocess("client", clients=self.clients)
+        if res and res.get("client") and res.get("topic"):
+            self.start_client_meeting(res["client"], res["topic"])
 
     def take_break(self, *_):
         """Pause tracking. Resumes the same project automatically on next activity."""
@@ -628,7 +754,83 @@ class KlickTime:
                 return
 
 
+def _run_dialog_subprocess(kind, clients=None):
+    """Launch the meeting dialog as a SEPARATE process (a real foreground window),
+    so the text field, dropdown, and buttons all work. Returns a dict or None."""
+    import subprocess, tempfile, json as _json
+    clients_path = out_path = None
+    try:
+        fd, out_path = tempfile.mkstemp(suffix=".json"); os.close(fd)
+        cmd = [sys.executable] if getattr(sys, "frozen", False) \
+            else [sys.executable, os.path.abspath(__file__)]
+        cmd += ["--dialog", kind, "--out", out_path]
+        if clients is not None:
+            fd, clients_path = tempfile.mkstemp(suffix=".json"); os.close(fd)
+            with open(clients_path, "w", encoding="utf-8") as f:
+                _json.dump(clients, f)
+            cmd += ["--clients", clients_path]
+        flags = 0x08000000 if IS_WINDOWS else 0   # CREATE_NO_WINDOW
+        subprocess.run(cmd, timeout=3600, creationflags=flags)
+        with open(out_path, "r", encoding="utf-8") as f:
+            return _json.load(f)
+    except Exception:
+        return None
+    finally:
+        for p in (clients_path, out_path):
+            if p:
+                try: os.remove(p)
+                except Exception: pass
+
+
+def _dialog_main():
+    """Runs in the separate process: shows one dialog, writes the result, exits."""
+    import json as _json
+    a = sys.argv
+    kind = clients_path = out_path = None
+    for i, x in enumerate(a):
+        if x == "--dialog" and i + 1 < len(a): kind = a[i + 1]
+        elif x == "--clients" and i + 1 < len(a): clients_path = a[i + 1]
+        elif x == "--out" and i + 1 < len(a): out_path = a[i + 1]
+    res = {}
+    if kind == "internal":
+        res = {"description": ask_text("Internal meeting", "What is the meeting about?")}
+    elif kind == "client":
+        clients = []
+        try:
+            with open(clients_path, "r", encoding="utf-8") as f:
+                clients = _json.load(f)
+        except Exception:
+            clients = []
+        client, topic = ask_client_meeting(clients)
+        res = {"client": client, "topic": topic}
+    if out_path:
+        try:
+            with open(out_path, "w", encoding="utf-8") as f:
+                _json.dump(res, f)
+        except Exception:
+            pass
+
+
+_INSTANCE_MUTEX = None
+
+
+def _acquire_single_instance():
+    """Return True if we are the only KlickTime tray instance; False if one already runs."""
+    global _INSTANCE_MUTEX
+    if not IS_WINDOWS:
+        return True
+    try:
+        _INSTANCE_MUTEX = ctypes.windll.kernel32.CreateMutexW(None, False, "Global\\KlickTime_Tray")
+        if ctypes.windll.kernel32.GetLastError() == 183:   # ERROR_ALREADY_EXISTS
+            return False
+    except Exception:
+        pass
+    return True
+
+
 def main():
+    if not _acquire_single_instance():
+        return                      # another KlickTime tray is already running
     cfg = {"server_url": "https://tt.klickevents.in"}
     if os.path.exists(CONFIG_PATH):
         try:
@@ -642,4 +844,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if "--dialog" in sys.argv:
+        _dialog_main()        # separate-process dialog mode
+    else:
+        main()

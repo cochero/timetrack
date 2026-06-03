@@ -1,6 +1,7 @@
 ; ============================================================
 ;  KlickTime installer  (compile with Inno Setup -> KlickTimeSetup.exe)
-;  Prerequisite: build dist\KlickTime.exe first (run build_KlickTime.bat)
+;  Prerequisite: build the one-folder app first (run build_KlickTime.bat),
+;  which produces dist\KlickTime\ (KlickTime.exe + supporting files).
 ; ============================================================
 
 #define AppName     "KlickTime"
@@ -25,7 +26,7 @@ SolidCompression=yes
 WizardStyle=modern
 
 [Files]
-Source: "dist\KlickTime.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist\KlickTime\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Tasks]
 Name: "autostart";  Description: "Start KlickTime automatically when I sign in to Windows"; Flags: checkedonce
