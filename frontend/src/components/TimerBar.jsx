@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import api from "../api/client";
 import { useCollection } from "../api/hooks";
 import { useAuth } from "../auth/AuthContext";
+import MeetingModal from "./MeetingModal";
 
 function fmt(totalSec) {
   const s = Math.max(0, Math.floor(totalSec));
@@ -18,6 +19,9 @@ export default function TimerBar() {
   const [elapsed, setElapsed] = useState(0);
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [meeting, setMeeting] = useState(null);   // null | "INTERNAL_MEETING" | "CLIENT_MEETING"
+  const [paused, setPaused] = useState(null);      // {id, name, client_name} when on break
   const tick = useRef(null);
 
   useEffect(() => {
@@ -60,7 +64,7 @@ export default function TimerBar() {
   async function startOn(pid) {
     if (busy) return;
     setBusy(true); setFlash("");
-    try { const r = await api.post("/timer/start/", { project: pid }); setActive(r.data); }
+    try { const r = await api.post("/timer/start/", { project: pid }); setActive(r.data); setPaused(null); }
     catch { /* ignore */ } finally { setBusy(false); }
   }
   async function stop() {
@@ -70,8 +74,23 @@ export default function TimerBar() {
       const r = await api.post("/timer/stop/");
       const m = r.data.minutes || 0, h = Math.floor(m / 60), mm = m % 60;
       setFlash(m > 0 ? `Logged ${h ? h + "h " : ""}${mm}m to ${r.data.project_name}.` : "Too short to log.");
-      setActive(null); setTimeout(() => setFlash(""), 6000);
+      setActive(null); setPaused(null); setTimeout(() => setFlash(""), 6000);
     } catch { /* ignore */ } finally { setBusy(false); }
+  }
+  async function takeBreak() {
+    if (busy || !active) return;
+    const proj = projectsById[active.project] ||
+      { id: active.project, name: active.project_name, client_name: active.client_name };
+    setBusy(true);
+    try {
+      await api.post("/timer/stop/");      // banks the time worked so far
+      setActive(null);
+      setPaused({ id: proj.id, name: proj.name, client_name: proj.client_name });
+      setFlash("On break. Press Resume when you're back.");
+    } catch { /* ignore */ } finally { setBusy(false); }
+  }
+  function resume() {
+    if (paused) startOn(paused.id);        // startOn clears paused
   }
   function onChipClick(p) {
     if (active && active.project === p.id) stop();
@@ -100,7 +119,47 @@ export default function TimerBar() {
           {otherProjects.map((p) => <option key={p.id} value={p.id}>{p.name} — {p.client_name}</option>)}
         </select>
       )}
+
+      {active && (
+        <button type="button" className="chip chip-break" onClick={takeBreak} disabled={busy}>
+          ⏸ Break
+        </button>
+      )}
+      {paused && !active && (
+        <button type="button" className="chip running chip-resume" onClick={resume} disabled={busy}>
+          ▶ Resume {paused.name}
+          {paused.client_name && <span className="chip-sub">· {paused.client_name}</span>}
+        </button>
+      )}
+
+      <div className="quick-menu">
+        <button type="button" className="chip chip-menu" onClick={() => setMenuOpen((o) => !o)}>
+          + Meeting ▾
+        </button>
+        {menuOpen && (
+          <>
+            <div className="quick-menu-backdrop" onClick={() => setMenuOpen(false)} />
+            <div className="quick-menu-list">
+              <button onClick={() => { setMeeting("INTERNAL_MEETING"); setMenuOpen(false); }}>
+                Internal meeting
+              </button>
+              <button onClick={() => { setMeeting("CLIENT_MEETING"); setMenuOpen(false); }}>
+                Client meeting
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+
       {flash && <span className="quick-flash">{flash}</span>}
+
+      {meeting && (
+        <MeetingModal
+          type={meeting}
+          onClose={() => setMeeting(null)}
+          onSaved={() => setFlash("Meeting logged.")}
+        />
+      )}
     </div>
   );
 }
